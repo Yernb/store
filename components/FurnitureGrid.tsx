@@ -55,7 +55,6 @@ export default function FurnitureGrid() {
               category={category}
               items={items}
               onItemClick={handleCardClick}
-              limit={2.5}
               showSeeAll={true}
             />
           ))}

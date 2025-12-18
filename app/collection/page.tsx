@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { furnitureItems, FurnitureItem } from '@/data/furniture'
@@ -8,7 +9,6 @@ import CategoryCarousel from '@/components/CategoryCarousel'
 import FurnitureModal from '@/components/FurnitureModal'
 
 export default function CollectionPage() {
-  const router = useRouter()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<FurnitureItem | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
