@@ -2,22 +2,31 @@
 
 import { useState, useEffect } from 'react'
 import { FurnitureItem } from '@/data/furniture'
-import { getFurnitureItems } from '@/lib/adminData'
+import { getFurnitureItems, getCategoryToParentMap, getCategories } from '@/lib/adminData'
 import CategoryCarousel from './CategoryCarousel'
 import FurnitureModal from './FurnitureModal'
+import FurnitureLoader from './FurnitureLoader'
 
 export default function FurnitureGrid() {
   const [selectedItem, setSelectedItem] = useState<FurnitureItem | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [furnitureItems, setFurnitureItems] = useState<FurnitureItem[]>([])
+  const [categoryToParentMap, setCategoryToParentMap] = useState<Map<string, string>>(new Map())
+  const [parentCategories, setParentCategories] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadFurniture = async () => {
       try {
-        const items = await getFurnitureItems()
+        const [items, categoryMap, parentCats] = await Promise.all([
+          getFurnitureItems(),
+          getCategoryToParentMap(),
+          getCategories()
+        ])
         setFurnitureItems(items)
+        setCategoryToParentMap(categoryMap)
+        setParentCategories(parentCats)
         setError(null)
       } catch (error: any) {
         console.error('Error loading furniture:', error)
@@ -29,14 +38,22 @@ export default function FurnitureGrid() {
     loadFurniture()
   }, [])
 
-  // Group furniture by category
-  const furnitureByCategory = furnitureItems.reduce((acc, item) => {
-    if (!acc[item.category]) {
-      acc[item.category] = []
+  // Group furniture by parent category (not subcategory)
+  const furnitureByParentCategory = furnitureItems.reduce((acc, item) => {
+    // Get the parent category name for this item's category
+    const parentCategoryName = categoryToParentMap.get(item.category) || item.category
+    
+    if (!acc[parentCategoryName]) {
+      acc[parentCategoryName] = []
     }
-    acc[item.category].push(item)
+    acc[parentCategoryName].push(item)
     return acc
   }, {} as Record<string, FurnitureItem[]>)
+
+  // Only show parent categories that have items
+  const categoriesToShow = parentCategories.filter(cat => 
+    furnitureByParentCategory[cat] && furnitureByParentCategory[cat].length > 0
+  )
 
   const handleCardClick = (item: FurnitureItem) => {
     setSelectedItem(item)
@@ -80,9 +97,7 @@ export default function FurnitureGrid() {
     return (
       <section id="furniture" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-gray-600">Loading furniture collection...</p>
-          </div>
+          <FurnitureLoader />
         </div>
       </section>
     )
@@ -105,16 +120,19 @@ export default function FurnitureGrid() {
             </p>
           </div>
 
-          {/* Category Carousels */}
-          {Object.entries(furnitureByCategory).map(([category, items]) => (
-            <CategoryCarousel
-              key={category}
-              category={category}
-              items={items}
-              onItemClick={handleCardClick}
-              showSeeAll={true}
-            />
-          ))}
+          {/* Category Carousels - Only show parent categories */}
+          {categoriesToShow.map((category) => {
+            const items = furnitureByParentCategory[category] || []
+            return (
+              <CategoryCarousel
+                key={category}
+                category={category}
+                items={items}
+                onItemClick={handleCardClick}
+                showSeeAll={true}
+              />
+            )
+          })}
         </div>
       </section>
 

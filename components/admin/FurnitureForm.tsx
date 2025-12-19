@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { FurnitureItem } from '@/data/furniture'
+import { CategoryWithSubcategories } from '@/lib/adminData'
 
 interface FurnitureFormProps {
   item: FurnitureItem | null
   categories: string[]
+  categoriesWithSubs: CategoryWithSubcategories[]
   onSave: (item: FurnitureItem) => void
   onCancel: () => void
 }
@@ -30,7 +32,10 @@ const isUrl = (str: string): boolean => {
   }
 }
 
-export default function FurnitureForm({ item, categories, onSave, onCancel }: FurnitureFormProps) {
+export default function FurnitureForm({ item, categories, categoriesWithSubs, onSave, onCancel }: FurnitureFormProps) {
+  const [selectedParentCategory, setSelectedParentCategory] = useState<string>('')
+  const [availableSubcategories, setAvailableSubcategories] = useState<Array<{ id: number; name: string }>>([])
+  
   const [formData, setFormData] = useState<Omit<FurnitureItem, 'id'>>({
     name: '',
     description: '',
@@ -41,6 +46,52 @@ export default function FurnitureForm({ item, categories, onSave, onCancel }: Fu
     inStock: true,
     quantity: 1,
   })
+
+  // Initialize parent category when categories load or form data changes
+  useEffect(() => {
+    if (formData.category && categoriesWithSubs.length > 0) {
+      // Check if the category is a parent or subcategory
+      const parentCategory = categoriesWithSubs.find(cat => cat.name === formData.category)
+      const subcategoryParent = categoriesWithSubs.find(cat => 
+        cat.subcategories.some(sub => sub.name === formData.category)
+      )
+      
+      if (parentCategory) {
+        // It's a parent category
+        setSelectedParentCategory(parentCategory.name)
+        setAvailableSubcategories(parentCategory.subcategories)
+      } else if (subcategoryParent) {
+        // It's a subcategory, find which parent it belongs to
+        setSelectedParentCategory(subcategoryParent.name)
+        setAvailableSubcategories(subcategoryParent.subcategories)
+      } else {
+        // Category doesn't exist in structure
+        // Try to match with first available parent
+        if (categories.length > 0 && categories.includes(formData.category)) {
+          setSelectedParentCategory(formData.category)
+          const found = categoriesWithSubs.find(cat => cat.name === formData.category)
+          setAvailableSubcategories(found?.subcategories || [])
+        } else {
+          setSelectedParentCategory('')
+          setAvailableSubcategories([])
+        }
+      }
+    } else if (!item && categories.length > 0 && categoriesWithSubs.length > 0) {
+      // For new items, initialize with first category
+      const firstCategory = categories[0]
+      const parentCategory = categoriesWithSubs.find(cat => cat.name === firstCategory)
+      if (parentCategory) {
+        setSelectedParentCategory(parentCategory.name)
+        setAvailableSubcategories(parentCategory.subcategories)
+        // If there are subcategories, use the first one, otherwise use parent
+        if (parentCategory.subcategories.length > 0) {
+          setFormData(prev => ({ ...prev, category: parentCategory.subcategories[0].name }))
+        } else {
+          setFormData(prev => ({ ...prev, category: parentCategory.name }))
+        }
+      }
+    }
+  }, [formData.category, categoriesWithSubs, categories, item])
 
   const [additionalImages, setAdditionalImages] = useState<string[]>([])
   const [additionalImageUrlList, setAdditionalImageUrlList] = useState<string[]>([])
@@ -133,6 +184,22 @@ export default function FurnitureForm({ item, categories, onSave, onCancel }: Fu
         quantity: item.quantity ?? 1,
       })
       
+      // Determine parent category for the item's category
+      const parentCategory = categoriesWithSubs.find(cat => 
+        cat.name === item.category || cat.subcategories.some(sub => sub.name === item.category)
+      )
+      if (parentCategory) {
+        if (parentCategory.name === item.category) {
+          // It's a parent category
+          setSelectedParentCategory(parentCategory.name)
+          setAvailableSubcategories(parentCategory.subcategories)
+        } else {
+          // It's a subcategory
+          setSelectedParentCategory(parentCategory.name)
+          setAvailableSubcategories(parentCategory.subcategories)
+        }
+      }
+      
       // Determine if main image is URL or base64
       if (item.image) {
         setImageInputMode(isUrl(item.image) ? 'url' : 'upload')
@@ -152,8 +219,12 @@ export default function FurnitureForm({ item, categories, onSave, onCancel }: Fu
       setAdditionalImageUrlList(urls)
       setAdditionalImageUrls(urls.join('\n'))
       setAdditionalImageInputMode(urls.length > 0 && base64Images.length === 0 ? 'url' : 'upload')
+    } else {
+      // Reset form for new item
+      setSelectedParentCategory('')
+      setAvailableSubcategories([])
     }
-  }, [item])
+  }, [item, categoriesWithSubs])
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -517,17 +588,68 @@ export default function FurnitureForm({ item, categories, onSave, onCancel }: Fu
               </label>
               <select
                 required
-                value={formData.category}
-                onChange={(e) => handleFieldChange('category', e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                value={selectedParentCategory}
+                onChange={(e) => {
+                  const parentName = e.target.value
+                  setSelectedParentCategory(parentName)
+                  // Find the category with subcategories
+                  const parentCategory = categoriesWithSubs.find(cat => cat.name === parentName)
+                  if (parentCategory) {
+                    setAvailableSubcategories(parentCategory.subcategories)
+                    // If there are subcategories, select the first one, otherwise use parent
+                    if (parentCategory.subcategories.length > 0) {
+                      handleFieldChange('category', parentCategory.subcategories[0].name)
+                    } else {
+                      handleFieldChange('category', parentName)
+                    }
+                  } else {
+                    setAvailableSubcategories([])
+                    handleFieldChange('category', parentName)
+                  }
+                }}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors mb-3"
               >
+                <option value="">Select a category...</option>
                 {categories.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Can't find the right category? We'll add it automatically. Don't worry, we've got this.
-              </p>
+              
+              {availableSubcategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Subcategory
+                    <span className="text-gray-400 font-normal ml-2 text-xs">
+                      (Optional - more specific category)
+                    </span>
+                  </label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => handleFieldChange('category', e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  >
+                    <option value={selectedParentCategory}>{selectedParentCategory} (Parent)</option>
+                    {availableSubcategories.map(sub => (
+                      <option key={sub.id} value={sub.name}>{sub.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Select a subcategory for more specific organization, or use the parent category.
+                  </p>
+                </div>
+              )}
+              
+              {availableSubcategories.length === 0 && selectedParentCategory && (
+                <p className="text-xs text-gray-500 mt-1">
+                  This category has no subcategories. Items will be assigned to "{selectedParentCategory}".
+                </p>
+              )}
+              
+              {!selectedParentCategory && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Select a category to continue. Can't find the right one? We'll add it automatically.
+                </p>
+              )}
             </div>
           </div>
 

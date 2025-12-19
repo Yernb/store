@@ -21,3 +21,4 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 4. Copy the "Project URL" and "anon public" key
 5. Paste them into your `.env.local` file
 
+

@@ -2,22 +2,26 @@
 
 import { useState, useEffect } from 'react'
 import { FurnitureItem } from '@/data/furniture'
-import { getFurnitureItems, saveFurnitureItems, getCategories, addCategory } from '@/lib/adminData'
+import { getFurnitureItems, saveFurnitureItems, getCategories, getCategoriesWithSubcategories, addCategory } from '@/lib/adminData'
+import { CategoryWithSubcategories } from '@/lib/adminData'
 import FurnitureForm from './FurnitureForm'
 
 export default function AdminFurnitureManager() {
   const [furniture, setFurniture] = useState<FurnitureItem[]>([])
   const [categories, setCategories] = useState<string[]>([])
+  const [categoriesWithSubs, setCategoriesWithSubs] = useState<CategoryWithSubcategories[]>([])
   
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [items, cats] = await Promise.all([
+        const [items, cats, catsWithSubs] = await Promise.all([
           getFurnitureItems(),
-          getCategories()
+          getCategories(),
+          getCategoriesWithSubcategories()
         ])
         setFurniture(items)
         setCategories(cats)
+        setCategoriesWithSubs(catsWithSubs)
       } catch (error) {
         console.error('Error loading data:', error)
       }
@@ -224,6 +228,7 @@ export default function AdminFurnitureManager() {
         <FurnitureForm
           item={editingItem}
           categories={categories}
+          categoriesWithSubs={categoriesWithSubs}
           onSave={handleSave}
           onCancel={handleCancel}
         />

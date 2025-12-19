@@ -64,11 +64,28 @@ export default function CategoryCarousel({ category, items, onItemClick, limit, 
 
   return (
     <div className="mb-16">
-      <div className="mb-8">
-        <h3 className="text-3xl font-bold text-gray-900 mb-2">{category}</h3>
-        <p className="text-gray-600">
-          Explore our curated selection of {category.toLowerCase()} furniture
-        </p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <Link 
+            href={`/category/${encodeURIComponent(category)}`}
+            className="group"
+          >
+            <h3 className="text-3xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+              {category}
+            </h3>
+          </Link>
+          <p className="text-gray-600">
+            Explore our curated selection of {category.toLowerCase()} furniture
+          </p>
+        </div>
+        {showSeeAll && (
+          <Link
+            href={`/category/${encodeURIComponent(category)}`}
+            className="self-start sm:self-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all duration-300 ease-out shadow-md hover:shadow-xl transform hover:-translate-y-0.5 whitespace-nowrap"
+          >
+            See All {category} →
+          </Link>
+        )}
       </div>
 
       <div className="relative">
@@ -127,17 +144,6 @@ export default function CategoryCarousel({ category, items, onItemClick, limit, 
         )}
       </div>
 
-      {/* See Collection button */}
-      {showSeeAll && hasMoreItems && (
-        <div className="mt-6 text-center">
-          <Link
-            href={`/collection?category=${encodeURIComponent(category)}`}
-            className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-all duration-300 ease-out shadow-md hover:shadow-xl transform hover:-translate-y-1"
-          >
-            See Collection
-          </Link>
-        </div>
-      )}
 
       <style jsx>{`
         .scrollbar-hide::-webkit-scrollbar {

@@ -1,6 +1,18 @@
 import { FurnitureItem } from '@/data/furniture'
 import { supabase } from './supabase'
 
+// Category type with subcategory support
+export interface Category {
+  id: number
+  name: string
+  parent_category_id: number | null
+  created_at?: string
+}
+
+export interface CategoryWithSubcategories extends Category {
+  subcategories: Category[]
+}
+
 // Helper to check if Supabase is configured
 function ensureSupabaseConfigured(): void {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -115,13 +127,14 @@ export async function resetFurnitureItems(): Promise<void> {
   }
 }
 
-// Get all categories from Supabase
+// Get all categories from Supabase (returns just names for backward compatibility)
 export async function getCategories(): Promise<string[]> {
   ensureSupabaseConfigured()
 
   const { data, error } = await supabase
     .from('categories')
     .select('name')
+    .is('parent_category_id', null) // Only top-level categories
     .order('name', { ascending: true })
 
   if (error) {
@@ -137,6 +150,158 @@ export async function getCategories(): Promise<string[]> {
   }
 
   return data.map(row => row.name).sort()
+}
+
+// Get all categories with full structure
+export async function getCategoriesFull(): Promise<Category[]> {
+  ensureSupabaseConfigured()
+
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .order('name', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching categories from Supabase:', error)
+    throw new Error(`Failed to fetch categories: ${error.message}`)
+  }
+
+  if (!data || data.length === 0) {
+    return []
+  }
+
+  return data.map(row => ({
+    id: row.id,
+    name: row.name,
+    parent_category_id: row.parent_category_id || null,
+    created_at: row.created_at,
+  }))
+}
+
+// Get categories with their subcategories
+export async function getCategoriesWithSubcategories(): Promise<CategoryWithSubcategories[]> {
+  const allCategories = await getCategoriesFull()
+  
+  // Get top-level categories (no parent)
+  const topLevelCategories = allCategories.filter(cat => !cat.parent_category_id)
+  
+  // Build structure with subcategories
+  return topLevelCategories.map(category => ({
+    ...category,
+    subcategories: allCategories.filter(cat => cat.parent_category_id === category.id),
+  }))
+}
+
+// Get subcategories for a specific category
+export async function getSubcategories(parentCategoryId: number): Promise<Category[]> {
+  ensureSupabaseConfigured()
+
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('parent_category_id', parentCategoryId)
+    .order('name', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching subcategories from Supabase:', error)
+    throw new Error(`Failed to fetch subcategories: ${error.message}`)
+  }
+
+  if (!data || data.length === 0) {
+    return []
+  }
+
+  return data.map(row => ({
+    id: row.id,
+    name: row.name,
+    parent_category_id: row.parent_category_id || null,
+    created_at: row.created_at,
+  }))
+}
+
+// Get category by name (can be parent or subcategory)
+export async function getCategoryByName(name: string): Promise<Category | null> {
+  ensureSupabaseConfigured()
+
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('name', name)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null // Not found
+    }
+    console.error('Error fetching category from Supabase:', error)
+    throw new Error(`Failed to fetch category: ${error.message}`)
+  }
+
+  if (!data) {
+    return null
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+    parent_category_id: data.parent_category_id || null,
+    created_at: data.created_at,
+  }
+}
+
+// Get parent category name for a given category name (returns the name itself if it's a parent)
+export async function getParentCategoryName(categoryName: string): Promise<string> {
+  ensureSupabaseConfigured()
+
+  // First, try to find the category
+  const category = await getCategoryByName(categoryName)
+  if (!category) {
+    // If category doesn't exist in database, return the name as-is (fallback)
+    return categoryName
+  }
+
+  // If it's a parent category (no parent_category_id), return the name itself
+  if (!category.parent_category_id) {
+    return category.name
+  }
+
+  // If it's a subcategory, get the parent category
+  const { data, error } = await supabase
+    .from('categories')
+    .select('name')
+    .eq('id', category.parent_category_id)
+    .single()
+
+  if (error || !data) {
+    // Fallback to the original name if parent not found
+    return categoryName
+  }
+
+  return data.name
+}
+
+// Get a map of category names to their parent category names
+export async function getCategoryToParentMap(): Promise<Map<string, string>> {
+  const allCategories = await getCategoriesFull()
+  const categoryMap = new Map<string, string>()
+
+  for (const category of allCategories) {
+    if (category.parent_category_id) {
+      // It's a subcategory, find its parent
+      const parent = allCategories.find(cat => cat.id === category.parent_category_id)
+      if (parent) {
+        categoryMap.set(category.name, parent.name)
+      } else {
+        // Fallback: use the category name itself
+        categoryMap.set(category.name, category.name)
+      }
+    } else {
+      // It's a parent category, map to itself
+      categoryMap.set(category.name, category.name)
+    }
+  }
+
+  return categoryMap
 }
 
 // Save categories
@@ -178,7 +343,7 @@ async function updateCategoriesFromItems(items: FurnitureItem[]): Promise<void> 
   await saveCategories(allCategories)
 }
 
-// Add a new category
+// Add a new category (top-level)
 export async function addCategory(category: string): Promise<void> {
   if (!category.trim()) return
 
@@ -189,7 +354,7 @@ export async function addCategory(category: string): Promise<void> {
     try {
       const { error } = await supabase
         .from('categories')
-        .insert({ name: category.trim() })
+        .insert({ name: category.trim(), parent_category_id: null })
 
       if (error && error.code !== '23505') { // Ignore duplicate key errors
         console.error('Error adding category to Supabase:', error)
@@ -202,9 +367,59 @@ export async function addCategory(category: string): Promise<void> {
   }
 }
 
-// Remove a category
+// Add a subcategory
+export async function addSubcategory(parentCategoryId: number, subcategoryName: string): Promise<void> {
+  if (!subcategoryName.trim()) return
+
+  ensureSupabaseConfigured()
+
+  // Check if parent category exists
+  const { data: parentCategory, error: parentError } = await supabase
+    .from('categories')
+    .select('id')
+    .eq('id', parentCategoryId)
+    .single()
+
+  if (parentError || !parentCategory) {
+    throw new Error(`Parent category not found`)
+  }
+
+  // Check if subcategory already exists for this parent
+  const { data: existing } = await supabase
+    .from('categories')
+    .select('id')
+    .eq('name', subcategoryName.trim())
+    .eq('parent_category_id', parentCategoryId)
+    .single()
+
+  if (existing) {
+    return // Already exists
+  }
+
+  try {
+    const { error } = await supabase
+      .from('categories')
+      .insert({ name: subcategoryName.trim(), parent_category_id: parentCategoryId })
+
+    if (error) {
+      console.error('Error adding subcategory to Supabase:', error)
+      throw new Error(`Failed to add subcategory: ${error.message}`)
+    }
+  } catch (error) {
+    console.error('Error adding subcategory:', error)
+    throw error
+  }
+}
+
+// Remove a category (will also delete subcategories due to CASCADE)
 export async function removeCategory(category: string, deleteItems: boolean = false): Promise<{ success: boolean; deletedItemsCount: number }> {
   ensureSupabaseConfigured()
+
+  // Get category ID
+  const categoryData = await getCategoryByName(category)
+  if (!categoryData) {
+    return { success: false, deletedItemsCount: 0 }
+  }
 
   const items = await getFurnitureItems()
   const itemsInCategory = items.filter(item => item.category === category)
@@ -219,12 +434,12 @@ export async function removeCategory(category: string, deleteItems: boolean = fa
     await saveFurnitureItems(updatedItems)
   }
 
-  // Remove from categories table
+  // Remove from categories table (CASCADE will delete subcategories)
   try {
     const { error } = await supabase
       .from('categories')
       .delete()
-      .eq('name', category)
+      .eq('id', categoryData.id)
 
     if (error) {
       console.error('Error deleting category from Supabase:', error)
@@ -235,9 +450,52 @@ export async function removeCategory(category: string, deleteItems: boolean = fa
     throw error
   }
 
-  const categories = await getCategories()
-  const updated = categories.filter(cat => cat !== category)
-  await saveCategories(updated)
+  return { success: true, deletedItemsCount: itemCount }
+}
+
+// Remove a subcategory
+export async function removeSubcategory(subcategoryId: number, deleteItems: boolean = false): Promise<{ success: boolean; deletedItemsCount: number }> {
+  ensureSupabaseConfigured()
+
+  // Get subcategory
+  const { data: subcategory, error: fetchError } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('id', subcategoryId)
+    .single()
+
+  if (fetchError || !subcategory) {
+    return { success: false, deletedItemsCount: 0 }
+  }
+
+  const items = await getFurnitureItems()
+  const itemsInSubcategory = items.filter(item => item.category === subcategory.name)
+  const itemCount = itemsInSubcategory.length
+
+  if (itemCount > 0 && !deleteItems) {
+    return { success: false, deletedItemsCount: 0 }
+  }
+
+  if (itemCount > 0 && deleteItems) {
+    const updatedItems = items.filter(item => item.category !== subcategory.name)
+    await saveFurnitureItems(updatedItems)
+  }
+
+  // Remove subcategory
+  try {
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', subcategoryId)
+
+    if (error) {
+      console.error('Error deleting subcategory from Supabase:', error)
+      throw new Error(`Failed to delete subcategory: ${error.message}`)
+    }
+  } catch (error) {
+    console.error('Error deleting subcategory:', error)
+    throw error
+  }
 
   return { success: true, deletedItemsCount: itemCount }
 }
