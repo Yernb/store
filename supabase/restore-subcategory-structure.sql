@@ -44,3 +44,5 @@ SET parent_category_id = (SELECT id FROM categories WHERE name = 'Furniture Pack
 WHERE name IN ('Starter Packages', 'Complete Packages')
   AND parent_category_id IS NULL;
 
+
+

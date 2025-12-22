@@ -15,3 +15,5 @@ ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_name_key;
 CREATE UNIQUE INDEX IF NOT EXISTS categories_name_parent_unique 
 ON categories(name, COALESCE(parent_category_id, -1));
 
+
+

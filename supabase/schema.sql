@@ -16,12 +16,21 @@ CREATE TABLE IF NOT EXISTS furniture_items (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create categories table
+-- Create categories table with subcategory support
 CREATE TABLE IF NOT EXISTS categories (
   id SERIAL PRIMARY KEY,
-  name VARCHAR(100) UNIQUE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  parent_category_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Create index for faster queries on parent_category_id
+CREATE INDEX IF NOT EXISTS idx_categories_parent_category_id ON categories(parent_category_id);
+
+-- Create unique constraint that allows same name only if they have different parents
+-- (NULL parent means top-level category, which should be unique)
+CREATE UNIQUE INDEX IF NOT EXISTS categories_name_parent_unique 
+ON categories(name, COALESCE(parent_category_id, -1));
 
 -- Create index on category for faster queries
 CREATE INDEX IF NOT EXISTS idx_furniture_items_category ON furniture_items(category);

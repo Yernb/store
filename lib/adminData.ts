@@ -180,16 +180,25 @@ export async function getCategoriesFull(): Promise<Category[]> {
 
 // Get categories with their subcategories
 export async function getCategoriesWithSubcategories(): Promise<CategoryWithSubcategories[]> {
-  const allCategories = await getCategoriesFull()
-  
-  // Get top-level categories (no parent)
-  const topLevelCategories = allCategories.filter(cat => !cat.parent_category_id)
-  
-  // Build structure with subcategories
-  return topLevelCategories.map(category => ({
-    ...category,
-    subcategories: allCategories.filter(cat => cat.parent_category_id === category.id),
-  }))
+  try {
+    const allCategories = await getCategoriesFull()
+    
+    // Get top-level categories (no parent)
+    const topLevelCategories = allCategories.filter(cat => !cat.parent_category_id)
+    
+    // Build structure with subcategories
+    return topLevelCategories.map(category => ({
+      ...category,
+      subcategories: allCategories.filter(cat => cat.parent_category_id === category.id),
+    }))
+  } catch (error: any) {
+    // If the error is about missing column, provide helpful message
+    if (error.message && error.message.includes('parent_category_id')) {
+      console.error('Subcategories not set up. Please run the migration: supabase/add-subcategories.sql')
+      throw new Error('Subcategories feature requires database migration. Please run supabase/add-subcategories.sql in your Supabase SQL Editor.')
+    }
+    throw error
+  }
 }
 
 // Get subcategories for a specific category
@@ -337,10 +346,42 @@ export async function saveCategories(categories: string[]): Promise<void> {
 
 // Update categories from items
 async function updateCategoriesFromItems(items: FurnitureItem[]): Promise<void> {
-  const currentCategories = await getCategories()
+  ensureSupabaseConfigured()
+  
+  // Get the full category structure (including subcategories)
+  const allExistingCategories = await getCategoriesFull()
   const itemCategories = Array.from(new Set(items.map(item => item.category)))
-  const allCategories = Array.from(new Set([...currentCategories, ...itemCategories])).sort()
-  await saveCategories(allCategories)
+  
+  // Get existing top-level category names
+  const existingTopLevelNames = allExistingCategories
+    .filter(cat => !cat.parent_category_id)
+    .map(cat => cat.name)
+  
+  // Get all existing category names (both parent and subcategories)
+  const allExistingNames = allExistingCategories.map(cat => cat.name)
+  
+  // Find new categories that don't exist yet
+  const newCategories = itemCategories.filter(catName => !allExistingNames.includes(catName))
+  
+  // Only add new top-level categories (don't touch existing structure)
+  for (const newCategoryName of newCategories) {
+    if (!existingTopLevelNames.includes(newCategoryName)) {
+      // This is a new top-level category, add it
+      try {
+        const { error } = await supabase
+          .from('categories')
+          .insert({ name: newCategoryName.trim(), parent_category_id: null })
+        
+        if (error && error.code !== '23505') { // Ignore duplicate key errors
+          console.error('Error adding new category:', error)
+        }
+      } catch (error) {
+        console.error('Error adding new category:', error)
+      }
+    }
+  }
+  
+  // Don't delete or modify existing categories - preserve subcategory structure
 }
 
 // Add a new category (top-level)

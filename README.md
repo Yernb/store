@@ -13,6 +13,7 @@ A modern furniture sales website with UK English copy and Jewish/Yiddish humour.
 - Supabase integration for database management
 - Real-time inventory tracking
 - Admin panel for managing furniture and categories
+- Secure admin authentication with password and OAuth (Google, GitHub)
 
 ## Getting Started
 
@@ -49,7 +50,19 @@ node supabase/migrate-data.js
 
 **Important:** Supabase is required for this application. The app will not work without proper Supabase configuration.
 
-### 4. Run Development Server
+### 4. Set Up Admin Authentication
+
+The admin dashboard requires authentication. See `AUTH_SETUP.md` for detailed instructions on:
+- Setting up password authentication
+- Configuring OAuth providers (Google, GitHub)
+- Creating admin users
+
+**Quick Start:**
+1. Navigate to `/admin` in your application
+2. Sign up with email/password or use OAuth
+3. Start managing your inventory
+
+### 5. Run Development Server
 
 ```bash
 npm run dev
@@ -60,7 +73,8 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ## Project Structure
 
 - `app/` - Next.js App Router pages and layouts
-- `components/` - React components
+- `components/` - React components (including admin components)
+- `contexts/` - React contexts (Cart, Auth)
 - `data/` - Furniture data and types
 - `lib/` - Utility functions and Supabase client
 - `supabase/` - Database schema and migration scripts

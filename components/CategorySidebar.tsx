@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { getCategoriesWithSubcategories } from '@/lib/adminData'
-import { CategoryWithSubcategories } from '@/lib/adminData'
+import { getCategoriesWithSubcategories, CategoryWithSubcategories } from '@/lib/adminData'
 
 interface CategorySidebarProps {
   isOpen: boolean
@@ -15,6 +14,7 @@ interface CategorySidebarProps {
 
 export default function CategorySidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse }: CategorySidebarProps) {
   const [categories, setCategories] = useState<CategoryWithSubcategories[]>([])
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
   const pathname = usePathname()
 
   useEffect(() => {
@@ -22,13 +22,30 @@ export default function CategorySidebar({ isOpen, onClose, isCollapsed = false, 
       try {
         const cats = await getCategoriesWithSubcategories()
         setCategories(cats)
+        // Auto-expand categories that have an active subcategory
+        const activeCategoryId = cats.find(cat => 
+          pathname === `/category/${encodeURIComponent(cat.name)}` ||
+          cat.subcategories.some(sub => pathname === `/category/${encodeURIComponent(sub.name)}`)
+        )?.id
+        if (activeCategoryId) {
+          setExpandedCategories(new Set([activeCategoryId]))
+        }
       } catch (error) {
         console.error('Error loading categories:', error)
       }
     }
     loadCategories()
-  }, [])
+  }, [pathname])
 
+  const toggleCategory = (categoryId: number) => {
+    const newExpanded = new Set(expandedCategories)
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId)
+    } else {
+      newExpanded.add(categoryId)
+    }
+    setExpandedCategories(newExpanded)
+  }
 
   const handleLinkClick = () => {
     // Close sidebar on mobile when a link is clicked
@@ -102,29 +119,77 @@ export default function CategorySidebar({ isOpen, onClose, isCollapsed = false, 
           {/* Categories list */}
           <nav className="space-y-1">
             {categories.map((category) => {
-              const isActive = pathname === `/category/${encodeURIComponent(category.name)}`
+              const isExpanded = expandedCategories.has(category.id)
+              const isParentActive = pathname === `/category/${encodeURIComponent(category.name)}`
+              const hasSubcategories = category.subcategories.length > 0
+              const hasActiveSubcategory = category.subcategories.some(sub => 
+                pathname === `/category/${encodeURIComponent(sub.name)}`
+              )
 
               return (
                 <div key={category.id} className="mb-1">
-                  <Link
-                    href={`/category/${encodeURIComponent(category.name)}`}
-                    onClick={handleLinkClick}
-                    className={`
-                      flex items-center rounded-lg text-sm font-medium transition-colors
-                      ${isCollapsed ? 'px-3 py-2.5 justify-center' : 'px-4 py-2.5'}
-                      ${isActive
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                      }
-                    `}
-                    title={isCollapsed ? category.name : undefined}
-                  >
-                    {isCollapsed ? (
-                      <span className="text-lg font-bold">{category.name.charAt(0)}</span>
-                    ) : (
-                      category.name
+                  <div className="flex items-center gap-2">
+                    {hasSubcategories && !isCollapsed && (
+                      <button
+                        onClick={() => toggleCategory(category.id)}
+                        className="p-1 text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0"
+                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                      >
+                        <svg
+                          className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
                     )}
-                  </Link>
+                    <Link
+                      href={`/category/${encodeURIComponent(category.name)}`}
+                      onClick={handleLinkClick}
+                      className={`
+                        flex-1 flex items-center rounded-lg text-sm font-medium transition-colors
+                        ${isCollapsed ? 'px-3 py-2.5 justify-center' : 'px-4 py-2.5'}
+                        ${isParentActive || hasActiveSubcategory
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        }
+                      `}
+                      title={isCollapsed ? category.name : undefined}
+                    >
+                      {isCollapsed ? (
+                        <span className="text-lg font-bold">{category.name.charAt(0)}</span>
+                      ) : (
+                        category.name
+                      )}
+                    </Link>
+                  </div>
+                  
+                  {/* Subcategories */}
+                  {hasSubcategories && isExpanded && !isCollapsed && (
+                    <div className="ml-6 mt-1 space-y-1">
+                      {category.subcategories.map((subcategory) => {
+                        const isSubActive = pathname === `/category/${encodeURIComponent(subcategory.name)}`
+                        return (
+                          <Link
+                            key={subcategory.id}
+                            href={`/category/${encodeURIComponent(subcategory.name)}`}
+                            onClick={handleLinkClick}
+                            className={`
+                              block px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                              ${isSubActive
+                                ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              }
+                            `}
+                          >
+                            {subcategory.name}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             })}

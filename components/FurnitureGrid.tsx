@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FurnitureItem } from '@/data/furniture'
-import { getFurnitureItems, getCategoryToParentMap, getCategories } from '@/lib/adminData'
+import { getFurnitureItems, getCategoriesWithSubcategories, CategoryWithSubcategories } from '@/lib/adminData'
 import CategoryCarousel from './CategoryCarousel'
 import FurnitureModal from './FurnitureModal'
 import FurnitureLoader from './FurnitureLoader'
@@ -11,22 +11,19 @@ export default function FurnitureGrid() {
   const [selectedItem, setSelectedItem] = useState<FurnitureItem | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [furnitureItems, setFurnitureItems] = useState<FurnitureItem[]>([])
-  const [categoryToParentMap, setCategoryToParentMap] = useState<Map<string, string>>(new Map())
-  const [parentCategories, setParentCategories] = useState<string[]>([])
+  const [categoriesWithSubs, setCategoriesWithSubs] = useState<CategoryWithSubcategories[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadFurniture = async () => {
       try {
-        const [items, categoryMap, parentCats] = await Promise.all([
+        const [items, categoriesData] = await Promise.all([
           getFurnitureItems(),
-          getCategoryToParentMap(),
-          getCategories()
+          getCategoriesWithSubcategories()
         ])
         setFurnitureItems(items)
-        setCategoryToParentMap(categoryMap)
-        setParentCategories(parentCats)
+        setCategoriesWithSubs(categoriesData)
         setError(null)
       } catch (error: any) {
         console.error('Error loading furniture:', error)
@@ -38,22 +35,41 @@ export default function FurnitureGrid() {
     loadFurniture()
   }, [])
 
-  // Group furniture by parent category (not subcategory)
+  // Create a map of category name (subcategory or parent) to parent category name
+  const categoryToParentMap = new Map<string, string>()
+  
+  categoriesWithSubs.forEach(parentCategory => {
+    // Map parent to itself
+    categoryToParentMap.set(parentCategory.name, parentCategory.name)
+    // Map each subcategory to its parent
+    parentCategory.subcategories.forEach(sub => {
+      categoryToParentMap.set(sub.name, parentCategory.name)
+    })
+  })
+
+  // Group furniture by parent category (aggregate all subcategory products under parent)
+  // IMPORTANT: Only show parent categories, never subcategories directly
   const furnitureByParentCategory = furnitureItems.reduce((acc, item) => {
     // Get the parent category name for this item's category
-    const parentCategoryName = categoryToParentMap.get(item.category) || item.category
+    // Only use mapped categories - ignore items with categories that don't map to a parent
+    const parentCategoryName = categoryToParentMap.get(item.category)
     
-    if (!acc[parentCategoryName]) {
-      acc[parentCategoryName] = []
+    // Only include items that map to a valid parent category
+    if (parentCategoryName) {
+      if (!acc[parentCategoryName]) {
+        acc[parentCategoryName] = []
+      }
+      acc[parentCategoryName].push(item)
     }
-    acc[parentCategoryName].push(item)
     return acc
   }, {} as Record<string, FurnitureItem[]>)
 
-  // Only show parent categories that have items
-  const categoriesToShow = parentCategories.filter(cat => 
-    furnitureByParentCategory[cat] && furnitureByParentCategory[cat].length > 0
-  )
+  // Filter to show ONLY parent categories that have items
+  // This ensures subcategories are never displayed as separate carousels
+  const categoriesToShow = categoriesWithSubs.filter(parentCategory => {
+    const items = furnitureByParentCategory[parentCategory.name] || []
+    return items.length > 0
+  })
 
   const handleCardClick = (item: FurnitureItem) => {
     setSelectedItem(item)
@@ -120,14 +136,16 @@ export default function FurnitureGrid() {
             </p>
           </div>
 
-          {/* Category Carousels - Only show parent categories */}
-          {categoriesToShow.map((category) => {
-            const items = furnitureByParentCategory[category] || []
+          {/* Category Carousels - Show only parent categories with all subcategory products aggregated */}
+          {categoriesToShow.map((parentCategory) => {
+            // Get all items for this parent category (aggregated from all subcategories)
+            const allItems = furnitureByParentCategory[parentCategory.name] || []
+            
             return (
               <CategoryCarousel
-                key={category}
-                category={category}
-                items={items}
+                key={parentCategory.id}
+                category={parentCategory.name}
+                items={allItems}
                 onItemClick={handleCardClick}
                 showSeeAll={true}
               />
