@@ -203,7 +203,7 @@ export default function FurnitureModal({ item, isOpen, onClose }: FurnitureModal
               item.inStock
                 ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
                 : 'bg-gray-400 cursor-not-allowed'
-            } text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 ease-out shadow-md hover:shadow-xl transform hover:-translate-y-1 active:translate-y-0 ${
+            } text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-out shadow-md hover:shadow-xl transform hover:-translate-y-1 active:translate-y-0 ${
               isAdding ? 'scale-95 bg-green-600 hover:bg-green-600' : ''
             }`}
           >

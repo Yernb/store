@@ -202,11 +202,15 @@ export default function AdminCategoryManager() {
       alert('This subcategory already exists for this category.')
       return
     }
-    
-    await addSubcategory(parentCategoryId, trimmed)
-    const updatedCats = await getCategoriesWithSubcategories()
-    setCategoriesWithSubs(updatedCats)
-    setNewSubcategory(null)
+
+    try {
+      await addSubcategory(parentCategoryId, trimmed)
+      const updatedCats = await getCategoriesWithSubcategories()
+      setCategoriesWithSubs(updatedCats)
+      setNewSubcategory(null)
+    } catch (error: any) {
+      alert(`Error adding subcategory: ${error.message}`)
+    }
   }
 
   const handleRenameCategory = async (oldCategory: string, newCategoryName: string) => {

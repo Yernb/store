@@ -239,10 +239,10 @@ export async function getCategoriesFull(): Promise<Category[]> {
 export async function getCategoriesWithSubcategories(): Promise<CategoryWithSubcategories[]> {
   try {
     const allCategories = await getCategoriesFull()
-    
+
     // Get top-level categories (no parent)
     const topLevelCategories = allCategories.filter(cat => !cat.parent_category_id)
-    
+
     // Build structure with subcategories
     return topLevelCategories.map(category => ({
       ...category,
@@ -468,18 +468,25 @@ export async function addCategory(category: string): Promise<void> {
 // Add a subcategory
 export async function addSubcategory(parentCategoryId: number, subcategoryName: string): Promise<void> {
   if (!subcategoryName.trim()) return
+  if (!parentCategoryId || parentCategoryId <= 0) {
+    throw new Error(`Invalid parent category ID`)
+  }
 
   ensureSupabaseConfigured()
 
-  // Check if parent category exists
+  // Check if parent category exists and is a top-level category (no parent)
   const { data: parentCategory, error: parentError } = await supabase
     .from('categories')
-    .select('id')
+    .select('id, parent_category_id')
     .eq('id', parentCategoryId)
     .single()
 
   if (parentError || !parentCategory) {
     throw new Error(`Parent category not found`)
+  }
+
+  if (parentCategory.parent_category_id !== null) {
+    throw new Error(`Cannot add subcategory to a subcategory. Only top-level categories can have subcategories.`)
   }
 
   // Check if subcategory already exists for this parent
