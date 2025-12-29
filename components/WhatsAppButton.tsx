@@ -3,7 +3,7 @@
 import Link from 'next/link'
 
 export default function WhatsAppButton() {
-  const phoneNumber = '+44 7476 452135'
+  const phoneNumber = '+44 20 8702 8025'
   // Remove all non-numeric characters for WhatsApp URL
   const whatsappUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}`
 

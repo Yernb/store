@@ -44,9 +44,9 @@ export default function Footer() {
               We&apos;re here to help.
             </p>
             <p className="text-sm">
-              <strong>Email:</strong> hello@furnishandgo.co.uk
+              <strong>Email:</strong> sales@furnishandgo.co.uk
               <br />
-              <strong>Phone:</strong> 020 7123 4567
+              <strong>Phone:</strong> 020 8702 8025
             </p>
           </div>
         </div>

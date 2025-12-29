@@ -72,10 +72,10 @@ export default function ContactPage() {
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-1">Email</h3>
                       <a
-                        href="mailto:hello@furnishandgo.co.uk"
+                        href="mailto:sales@furnishandgo.co.uk"
                         className="text-blue-600 hover:text-blue-700 transition-colors"
                       >
-                        hello@furnishandgo.co.uk
+                        sales@furnishandgo.co.uk
                       </a>
                     </div>
                   </div>
@@ -100,10 +100,10 @@ export default function ContactPage() {
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-1">Phone</h3>
                       <a
-                        href="tel:02071234567"
+                        href="tel:02087028025"
                         className="text-blue-600 hover:text-blue-700 transition-colors"
                       >
-                        020 7123 4567
+                        020 8702 8025
                       </a>
                     </div>
                   </div>
@@ -186,7 +186,7 @@ export default function ContactPage() {
                       value={formData.phone}
                       onChange={handleChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                      placeholder="020 7123 4567"
+                      placeholder="020 8702 8025"
                     />
                   </div>
 
