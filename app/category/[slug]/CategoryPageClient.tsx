@@ -1,56 +1,19 @@
-import { Metadata } from 'next'
-import CategoryPageClient from './CategoryPageClient'
+'use client'
 
-// Static generation for all category pages
-export async function generateStaticParams() {
-  // These are the category names from the seed data
-  const categories = [
-    'Dining',
-    'Seating',
-    'Storage',
-    'Bedroom',
-    'Tables',
-    'Kitchen Appliances',
-    'Furniture Packages',
-    // Subcategories
-    'Dining Tables',
-    'Dining Chairs',
-    'Dining Sets',
-    'Sofas',
-    'Armchairs',
-    'Recliners',
-    'Bookshelves',
-    'Cabinets',
-    'Wardrobes',
-    'Beds',
-    'Bedside Tables',
-    'Dressers',
-    'Coffee Tables',
-    'Side Tables',
-    'Refrigerators',
-    'Ovens',
-    'Dishwashers',
-    'Starter Packages',
-    'Complete Packages'
-  ]
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
+import Header from '@/components/Header'
+import Footer from '@/components/Footer'
+import { FurnitureItem } from '@/data/furniture'
+import type { CategoryWithSubcategories } from '@/lib/adminData'
+import { getFurnitureItems, getCategoriesWithSubcategories, getCategoryToParentMap } from '@/lib/adminData'
+import FurnitureModal from '@/components/FurnitureModal'
+import CategorySidebar from '@/components/CategorySidebar'
+import Link from 'next/link'
+import FurnitureCard from '@/components/FurnitureCard'
+import FurnitureLoader from '@/components/FurnitureLoader'
 
-  return categories.map((category) => ({
-    slug: encodeURIComponent(category),
-  }))
-}
-
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const categoryName = decodeURIComponent(params.slug)
-
-  return {
-    title: `${categoryName} - FurnishAndGo`,
-    description: `Browse our collection of ${categoryName.toLowerCase()} furniture. Quality pieces at affordable prices.`,
-  }
-}
-
-export default function CategoryPage() {
-  return <CategoryPageClient />
-}
+export default function CategoryPageClient() {
   const params = useParams()
   const categorySlug = params?.slug as string
   const decodedCategory = categorySlug ? decodeURIComponent(categorySlug) : null
@@ -81,15 +44,15 @@ export default function CategoryPage() {
           getCategoriesWithSubcategories(),
           getCategoryToParentMap()
         ])
-        
+
         setFurnitureItems(items)
         setCategoryToParentMap(categoryMap)
         setCategoriesWithSubs(categoriesWithSubsData)
-        
+
         // Find the category (could be parent or subcategory)
         const category = categoriesWithSubsData.find(cat => cat.name === decodedCategory) ||
           categoriesWithSubsData.flatMap(cat => cat.subcategories).find(sub => sub.name === decodedCategory)
-        
+
         if (category) {
           setCategoryData({
             id: category.id,
@@ -135,7 +98,7 @@ export default function CategoryPage() {
   // Filter furniture items by category
   // If selected category is a parent category, show items from parent + all subcategories
   // If selected category is a subcategory, show only items from that subcategory
-  const categoryFilteredItems = categoryData 
+  const categoryFilteredItems = categoryData
     ? furnitureItems.filter(item => {
         // Check if selected category is a parent category
         if (selectedCategory) {
@@ -143,26 +106,26 @@ export default function CategoryPage() {
           // 1. category matches the parent category
           // 2. OR subcategory belongs to this parent
           if (item.category === categoryData.name) return true
-          
+
           const subcategoryNames = selectedCategory.subcategories.map(sub => sub.name)
           if (item.subcategory && subcategoryNames.includes(item.subcategory)) return true
-          
+
           // Backward compatibility: if item.category is a subcategory name, check if it belongs to this parent
           if (subcategoryNames.includes(item.category)) return true
         } else {
           // Selected is a subcategory - show only items with this subcategory
           if (item.subcategory === categoryData.name) return true
-          
+
           // Backward compatibility: if item.category is the subcategory name
           if (item.category === categoryData.name) {
             // Check if it's actually a subcategory (not a parent)
-            const isSubcategory = categoriesWithSubs.some(cat => 
+            const isSubcategory = categoriesWithSubs.some(cat =>
               cat.subcategories.some(sub => sub.name === categoryData.name)
             )
             if (isSubcategory) return true
           }
         }
-        
+
         return false
       })
     : []
@@ -175,10 +138,10 @@ export default function CategoryPage() {
       const itemSubcategory = item.subcategory || (categoryToParentMap.get(item.category) !== item.category ? item.category : null)
       if (!itemSubcategory || !selectedSubcategories.has(itemSubcategory)) return false
     }
-    
+
     // Price range filter
     if (item.price < priceRange.min || item.price > priceRange.max) return false
-    
+
     return true
   })
 
@@ -296,8 +259,8 @@ export default function CategoryPage() {
     <main className="min-h-screen bg-gradient-to-b from-white to-gray-50 animate-fade-in">
       <Header />
       {/* Sidebar */}
-      <CategorySidebar 
-        isOpen={sidebarOpen} 
+      <CategorySidebar
+        isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -549,4 +512,3 @@ export default function CategoryPage() {
     </main>
   )
 }
-
